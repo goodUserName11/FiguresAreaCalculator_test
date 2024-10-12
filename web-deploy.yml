@@ -1,0 +1,60 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: my-web-app1
+spec:
+  replicas: 3 # Количество подов
+  template:
+    metadata:
+      labels:
+        app: my-web-app1
+    spec:
+      # Настройка предпочтений размещения
+      affinity:
+        # Инструкция размещения подов на разных нодах
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - my-web-app1
+              # Домен, узлы которого соответствуют требованиям nodeAffinityPolicy
+              topologyKey: "kubernetes.io/hostname"
+      containers:
+        - name: my-web-app1-container
+          image: my-web-app1-image:latest
+          resources:
+            requests:
+              memory: "128Mi" # Минимально гарантируемая память на под
+              cpu: "0.1" # CPU для обработки нагрузки на старте
+            limits:
+              memory: "128Mi" # Ограничение максимальной памяти  
+              cpu: "0.5" # Ограничение использования cpu для пиковых нагрузок
+          readinessProbe:  # Проверка готовности
+            httpGet:
+              path: /health  # Путь для проверки состояния готовности
+              port: 80  # Порт, на котором приложение отвечает
+            initialDelaySeconds: 10  # Задержка перед первой проверкой готовности
+            periodSeconds: 5  # Проверяем состояние каждые 5 секунд
+            timeoutSeconds: 2  # Таймаут для проверки
+            successThreshold: 1  # Минимум 1 успешный ответ
+            failureThreshold: 3  # Если 3 попытки неудачны, под считается неготовым
+  selector:
+    matchLabels:
+      app: my-web-app1
+---
+#!!!!
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-web-app1
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: my-web-app1
